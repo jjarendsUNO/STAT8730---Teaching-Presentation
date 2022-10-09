@@ -18,13 +18,13 @@ library(tidymodels)
 - With unbalanced data, overall accuracy is often inappropriate
 - True negative, true positive, weighted accuracy, G-mean, precision, recall, and F-measure
 
-$True\ Negative (Acc^-) = \frac{TN}{TN + FP}$
-$True\ Positive (Acc^+)= \frac{TP}{FP + FN}$
-$G-mean = (Acc^- \times Acc^+)^{1/2}$
-$Weighted\ Accuracy = \beta Acc^- + (1-\beta)Acc^-$
-$Precision = \frac{TP}{TP+FN}$
-$Recall = \frac{TP}{TP+FN} = Acc^+$
-$F-Measure = \frac{2 \times Precision \times Recall}{Precision+Recall}$    
+| $True\ Negative (Acc^-) = \frac{TN}{TN + FP}$
+| $True\ Positive (Acc^+)= \frac{TP}{FP + FN}$
+| $G-mean = (Acc^- \times Acc^+)^{1/2}$
+| $Weighted\ Accuracy = \beta Acc^- + (1-\beta)Acc^-$
+| $Precision = \frac{TP}{TP+FN}$
+| $Recall = \frac{TP}{TP+FN} = Acc^+$
+| $F-Measure = \frac{2 \times Precision \times Recall}{Precision+Recall}$    
 
 
 # Modeling
