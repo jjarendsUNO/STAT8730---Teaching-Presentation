@@ -2,7 +2,7 @@
 title: "Presentation Code"
 author: "Justin Arends"
 date: "2022-10-13"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
