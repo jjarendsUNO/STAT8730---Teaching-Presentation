@@ -6,7 +6,7 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(tidymodels)
@@ -27,20 +27,10 @@ library(tidymodels)
 | $F-Measure = \frac{2 \times Precision \times Recall}{Precision+Recall}$    
 
 
-# Modeling
+# Measures
 
-## Oil Data
-```{r}
-oil_data <- read_csv("https://github.com/jbrownlee/Datasets/raw/master/oil-spill.csv",col_names = NULL)
+## Custom Measures based on the out-of-the-box in `tidymodels`
 
-# X51 is the classification column
-
-oil_data$X50 <- as.factor(oil_data$X50)
-
-
-
-```
-Custom Measures
 ```{r}
 f_meas_beta_vec <- function(truth,
                             estimate,
@@ -122,6 +112,53 @@ test_recall <- new_class_metric(recall_second, "maximize")
 
 ```
 
+### Custom Measures based on the paper
+
+```{r Custom Metics}
+metrics <- function(conf_mat){
+  TP = conf_mat$table[2,2]
+  FP = conf_mat$table[1,2]
+  TN = conf_mat$table[1,1]
+  FN = conf_mat$table[2,1]
+  
+  precision = TP/(TP+FP)
+  TNR = TN / (TN+FP)
+  TPR = TP / (TP+FN)
+  
+  gMean = (TNR * TPR)^(1/2)
+  
+  fMeasure = (2*precision*TPR)/(precision + TPR)
+  
+  wAccuracy = (.5*TPR) + (1-.5)*TNR
+  
+  return(
+    tibble(
+      "Measure" = c("Precision", "TNR", "TPR", "G-Mean", "F-Measure", "Weighted Accuracy"),
+      "Value" = c(precision, TNR,TPR, gMean, fMeasure, wAccuracy)
+    )
+  )
+}
+```
+
+# Modeling
+
+## Oil Data
+
+I'm going to start a test with oil data since it's smaller and faster to iterate over.
+
+```{r}
+oil_data <- read_csv("https://github.com/jbrownlee/Datasets/raw/master/oil-spill.csv",col_names = NULL)
+
+# X51 is the classification column
+
+oil_data$X50 <- as.factor(oil_data$X50)
+
+
+
+```
+
+Create different folds
+
 ```{r}
 
 set.seed(1234)
@@ -137,6 +174,8 @@ oil.folds <- vfold_cv(oil.train, strata = X50)
 oil.boots <- bootstraps(oil.train, strata = X50, pool = .5)
 
 ```
+
+Creating a basic recipe
 
 ```{r}
 oil.recipe <- recipe(X50 ~., data = oil.train) %>% 
@@ -160,6 +199,7 @@ prep(oil.recipe) %>% juice() %>% count(X50)
 
 ```
 
+Fitting with the basic model on the oild data. Using `tidymodel's` out of the box metrics...
 
 ```{r}
 set.seed(123)
@@ -176,36 +216,27 @@ oil.fold.fit <-
                                               recall,
                                               test_recall,
                                               precision
-                                              ))
+                                              ),
+                control = control_grid(save_pred = TRUE))
 
 oil.fold.fit %>% 
   collect_metrics()
 ```
 
-```{r}
-last_fit(
-  oil.rf.wf,
-  oil.split,
-  metrics = metric_set(
-    accuracy,
-    roc_auc,
-    specificity,
-    recall,
-    f_meas,
-    test_f,
-    sens,
-    recall,
-    test_recall,
-    precision
-  )
-) %>%
-  collect_metrics()
+They yield slightly different results, so I'll go ahead and leverage the custom metrics I build based on the paper's formula.
 
+
+```{r}
+oil.fold.fit %>% 
+  collect_predictions() %>% 
+  conf_mat(truth = X50, estimate = .pred_class) %>%
+  metrics()
+  
 ```
 
+I think this is fairly close to the "one-sided sampling" table of the oil data. So, I'll use this structure on the Mammography data.
 
-
-## Mammography
+# Mammography
 ```{r}
 mam.data <- read_csv("https://github.com/jbrownlee/Datasets/raw/master/mammography.csv", 
                      col_names  = NULL) %>% 
@@ -215,7 +246,9 @@ mam.data <- read_csv("https://github.com/jbrownlee/Datasets/raw/master/mammograp
 
 ```
 
-### Training/Testing Splits
+## Training/Testing Splits
+
+Divide the data into training/testing/and folds.
 
 ```{r}
 set.seed(1234)
@@ -246,7 +279,9 @@ weighted.mam.folds <- vfold_cv(weighted.mam.train, strata = X7)
 weighted.mam.boots <- bootstraps(weighted.mam.train, strata = X7, pool = .5)
 ```
 
-```{r}
+All the model recipes
+
+```{r, echo = TRUE}
 mam.rec.balanced <- 
   recipe(X7 ~ ., data = mam.train) %>% 
   themis::step_upsample(X7, over_ratio = 1) 
@@ -319,7 +354,7 @@ mam.wf <-
 ```
 
 
-```{r, Resampling Fits}
+```{r Resampling Fits, cache = TRUE}
 set.seed(123)
 
 doParallel::registerDoParallel()
@@ -421,7 +456,7 @@ mam.fold.fit.balanced.7 <-
 
 ```
 
-```{r, Confusion Matrices}
+```{r Confusion Matrices, echo = FALSE}
 mam.confusion.matrix.2 <- 
   mam.fold.fit.2 %>% 
   collect_predictions() %>% 
@@ -468,37 +503,9 @@ mam.confusion.matrix.balanced.7 <-
 
 ```
 
-### Custom Function to pull back metrics
-
-```{r Custom Metics}
-metrics <- function(conf_mat){
-  TP = conf_mat$table[2,2]
-  FP = conf_mat$table[1,2]
-  TN = conf_mat$table[1,1]
-  FN = conf_mat$table[2,1]
-  
-  precision = TP/(TP+FP)
-  TNR = TN / (TN+FP)
-  TPR = TP / (TP+FN)
-  
-  gMean = (TNR * TPR)^(1/2)
-  
-  fMeasure = (2*precision*TPR)/(precision + TPR)
-  
-  wAccuracy = (.5*TPR) + (1-.5)*TNR
-  
-  return(
-    tibble(
-      "Measure" = c("Precision", "TNR", "TPR", "G-Mean", "F-Measure", "Weighted Accuracy"),
-      "Value" = c(precision, TNR,TPR, gMean, fMeasure, wAccuracy)
-    )
-  )
-}
-```
-
+## Joining all the different models into a single table to compare
 
 ```{r, Metrics Table}
-
 metric_table <- 
   do.call(
     "rbind",
