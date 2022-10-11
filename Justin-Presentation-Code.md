@@ -172,11 +172,7 @@ Creating a basic recipe
 
 ``` r
 oil.recipe <- recipe(X50 ~., data = oil.train) %>% 
-  update_role(X1, new_role = 'id') #%>% 
-  #themis::step_downsample(X50) %>% 
-  # step_smote(X50, over_ratio = 5) %>% 
-  # themis::step_downsample(X50, under_ratio = .5)
-
+  update_role(X1, new_role = 'id')
 oil.rf.spec <- 
   rand_forest(trees = 1000,
               mode = "classification") %>% 
@@ -276,8 +272,15 @@ mam.data <- read_csv("https://github.com/jbrownlee/Datasets/raw/master/mammograp
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
 ``` r
-# Predict X7
+mam.data %>% 
+  count(X7)
 ```
+
+    ## # A tibble: 2 × 2
+    ##   X7        n
+    ##   <fct> <int>
+    ## 1 0     10923
+    ## 2 1       260
 
 ## Training/Testing Splits
 
@@ -293,23 +296,6 @@ mam.test <- training(mam.split)
 set.seed(456)
 
 mam.folds <- vfold_cv(mam.train, strata = X7)
-
-mam.boots <- bootstraps(mam.train, strata = X7, pool = .5)
-
-
-weighted.mam <- 
-  mam.data %>% 
-  mutate(case_weights = ifelse(X7 == 1, 30, 1),
-         case_weights = importance_weights(case_weights))
-
-weighted.mam.split <- initial_split(weighted.mam, strata = X7)
-weighted.mam.train <- training(weighted.mam.split)
-weighted.mam.test <- training(weighted.mam.split)
-
-set.seed(456)
-weighted.mam.folds <- vfold_cv(weighted.mam.train, strata = X7)
-
-weighted.mam.boots <- bootstraps(weighted.mam.train, strata = X7, pool = .5)
 ```
 
 All the model recipes
@@ -385,8 +371,8 @@ mam.wf <-
 
 ``` r
 set.seed(123)
+doParallel::registerDoParallel(parallel::makeCluster(7))
 
-doParallel::registerDoParallel()
 mam.fold.fit.2 <-
   mam.wf %>%
   fit_resamples(
@@ -445,7 +431,7 @@ mam.fold.fit.balanced.5 <-
   update_recipe(mam.rec.balanced) %>%
   update_model(rf.spec.balanced.5) %>% 
   fit_resamples(
-    mam.boots,
+    mam.folds,
     metrics = metric_set(
       accuracy,
       roc_auc
@@ -459,7 +445,7 @@ mam.fold.fit.balanced.6 <-
   update_recipe(mam.rec.balanced) %>%
   update_model(rf.spec.balanced.6) %>% 
   fit_resamples(
-    mam.boots,
+    mam.folds,
     metrics = metric_set(
       accuracy,
       roc_auc
@@ -474,7 +460,7 @@ mam.fold.fit.balanced.7 <-
   update_recipe(mam.rec.balanced) %>%
   update_model(rf.spec.balanced.7) %>% 
   fit_resamples(
-    mam.boots,
+    mam.folds,
     metrics = metric_set(
       accuracy,
       roc_auc
@@ -519,10 +505,109 @@ metric_table %>%
     ## # A tibble: 7 × 7
     ##   model        Precision   TNR   TPR `G-Mean` `F-Measure` `Weighted Accuracy`
     ##   <chr>            <dbl> <dbl> <dbl>    <dbl>       <dbl>               <dbl>
-    ## 1 SMOTE 100        0.735 0.993 0.568    0.751       0.641               0.781
-    ## 2 SMOTE 200        0.73  0.993 0.598    0.771       0.658               0.796
+    ## 1 SMOTE 100        0.74  0.994 0.576    0.756       0.648               0.785
+    ## 2 SMOTE 200        0.715 0.993 0.601    0.772       0.653               0.797
     ## 3 Weighted 2:1     0.525 0.989 0.847    0.915       0.648               0.918
     ## 4 Weighted 3:1     0.54  0.989 0.850    0.917       0.661               0.920
-    ## 5 Balanced .5      0.537 0.989 0.795    0.886       0.641               0.892
-    ## 6 Balanced .6      0.540 0.989 0.8      0.889       0.645               0.895
-    ## 7 Balanced .7      0.535 0.989 0.799    0.889       0.641               0.894
+    ## 5 Balanced .5      0.595 0.990 0.815    0.898       0.688               0.903
+    ## 6 Balanced .6      0.6   0.990 0.805    0.893       0.688               0.898
+    ## 7 Balanced .7      0.6   0.990 0.816    0.899       0.692               0.903
+
+## SMOTEBoost
+
+``` r
+library(ebmc)
+
+#Models
+mam.train2 <- as.data.frame(mam.train)  
+
+mam.fit.smote.100 <-
+  sbo(
+    X7 ~ .,
+    data = mam.train2,
+    size = 3,
+    alg = "rf",
+    over = 100,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+mam.fit.smote.300 <-
+  sbo(
+    X7 ~ .,
+    data = mam.train2,
+    size = 3,
+    alg = "rf",
+    over = 300,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+
+
+# Predictions
+pred.mam.fit.smote.100 <- 
+  predict.modelBst(mam.fit.smote.100, 
+                   newdata = mam.test[,-7], 
+                   type = "class")
+
+pred.mam.fit.smote.300 <- 
+  predict.modelBst(mam.fit.smote.300, 
+                   newdata = mam.test[,-7], 
+                   type = "class")
+
+# confusion matrices
+smote.100.conf.mat <- tibble("truth" = mam.test$X7,
+                             "prediction" = pred.mam.fit.smote.100) %>% 
+  conf_mat(truth = truth, 
+           estimate = prediction) 
+
+smote.300.conf.mat <- tibble("truth" = mam.test$X7,
+                             "prediction" = pred.mam.fit.smote.300) %>% 
+  conf_mat(truth = truth, 
+           estimate = prediction) 
+```
+
+``` r
+metric_table <- 
+  do.call(
+    "rbind",
+    list(
+      metrics(mam.confusion.matrix.smote.100) %>% mutate(model = "SMOTE 100"),
+      metrics(mam.confusion.matrix.smote.200) %>% mutate(model = "SMOTE 200"),
+      metrics(mam.confusion.matrix.2) %>% mutate(model = "Weighted 2:1"),
+      metrics(mam.confusion.matrix.3) %>% mutate(model = "Weighted 3:1"),
+      metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
+      metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
+      metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7"),
+      metrics(smote.100.conf.mat) %>% mutate(model = "SMOTEBOOST 100"),
+      metrics(smote.300.conf.mat) %>% mutate(model = "SMOTEBOOST 300")
+
+    )
+  ) 
+
+metric_table %>% 
+  ggplot(aes(Value, model))+
+  geom_col()+
+  facet_wrap(~Measure, scales = "free_x")
+```
+
+![](Justin-Presentation-Code_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+``` r
+metric_table %>% 
+  pivot_wider(id_cols = model,
+              values_from = Value,
+              names_from = Measure)
+```
+
+    ## # A tibble: 9 × 7
+    ##   model          Precision   TNR   TPR `G-Mean` `F-Measure` `Weighted Accuracy`
+    ##   <chr>              <dbl> <dbl> <dbl>    <dbl>       <dbl>               <dbl>
+    ## 1 SMOTE 100          0.74  0.994 0.576    0.756       0.648               0.785
+    ## 2 SMOTE 200          0.715 0.993 0.601    0.772       0.653               0.797
+    ## 3 Weighted 2:1       0.525 0.989 0.847    0.915       0.648               0.918
+    ## 4 Weighted 3:1       0.54  0.989 0.850    0.917       0.661               0.920
+    ## 5 Balanced .5        0.595 0.990 0.815    0.898       0.688               0.903
+    ## 6 Balanced .6        0.6   0.990 0.805    0.893       0.688               0.898
+    ## 7 Balanced .7        0.6   0.990 0.816    0.899       0.692               0.903
+    ## 8 SMOTEBOOST 100     0.935 0.998 0.995    0.997       0.964               0.997
+    ## 9 SMOTEBOOST 300     0.93  0.998 0.979    0.989       0.954               0.989

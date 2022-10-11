@@ -2,7 +2,7 @@
 title: "Presentation Code"
 author: "Justin Arends"
 date: "2022-10-13"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -513,4 +513,88 @@ metric_table %>%
               names_from = Measure)
 ```
 
+## SMOTEBoost
+```{r}
+library(ebmc)
+
+#Models
+mam.train2 <- as.data.frame(mam.train)  
+
+mam.fit.smote.100 <-
+  sbo(
+    X7 ~ .,
+    data = mam.train2,
+    size = 3,
+    alg = "rf",
+    over = 100,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+mam.fit.smote.300 <-
+  sbo(
+    X7 ~ .,
+    data = mam.train2,
+    size = 3,
+    alg = "rf",
+    over = 300,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+
+
+# Predictions
+pred.mam.fit.smote.100 <- 
+  predict.modelBst(mam.fit.smote.100, 
+                   newdata = mam.test[,-7], 
+                   type = "class")
+
+pred.mam.fit.smote.300 <- 
+  predict.modelBst(mam.fit.smote.300, 
+                   newdata = mam.test[,-7], 
+                   type = "class")
+
+# confusion matrices
+smote.100.conf.mat <- tibble("truth" = mam.test$X7,
+                             "prediction" = pred.mam.fit.smote.100) %>% 
+  conf_mat(truth = truth, 
+           estimate = prediction) 
+
+smote.300.conf.mat <- tibble("truth" = mam.test$X7,
+                             "prediction" = pred.mam.fit.smote.300) %>% 
+  conf_mat(truth = truth, 
+           estimate = prediction) 
+
+
+```
+
+```{r}
+metric_table <- 
+  do.call(
+    "rbind",
+    list(
+      metrics(mam.confusion.matrix.smote.100) %>% mutate(model = "SMOTE 100"),
+      metrics(mam.confusion.matrix.smote.200) %>% mutate(model = "SMOTE 200"),
+      metrics(mam.confusion.matrix.2) %>% mutate(model = "Weighted 2:1"),
+      metrics(mam.confusion.matrix.3) %>% mutate(model = "Weighted 3:1"),
+      metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
+      metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
+      metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7"),
+      metrics(smote.100.conf.mat) %>% mutate(model = "SMOTEBOOST 100"),
+      metrics(smote.300.conf.mat) %>% mutate(model = "SMOTEBOOST 300")
+
+    )
+  ) 
+
+metric_table %>% 
+  ggplot(aes(Value, model))+
+  geom_col()+
+  facet_wrap(~Measure, scales = "free_x")
+
+
+metric_table %>% 
+  pivot_wider(id_cols = model,
+              values_from = Value,
+              names_from = Measure)
+
+```
 
