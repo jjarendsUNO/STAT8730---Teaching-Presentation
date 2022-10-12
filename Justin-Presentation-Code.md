@@ -566,6 +566,100 @@ smote.300.conf.mat <- tibble("truth" = mam.test$X7,
            estimate = prediction) 
 ```
 
+### For loop for SMOTE Boost
+
+``` r
+library(ebmc)
+results100 <- tibble()
+
+
+for (i in 1:10) {
+  temp_train <-
+    mam.folds$splits[[i]] %>% 
+    training() %>% 
+    as.data.frame()
+  
+  temp_test <- 
+    mam.folds$splits[[i]] %>% 
+    testing() %>% 
+    as.data.frame()
+  
+  
+  temp_smote100 <-
+    sbo(
+      X7 ~ .,
+      data = temp_train,
+      size = 3,
+      alg = "rf",
+      over = 100,
+      svm.ker = "sigmoid",
+      rf.ntree = 500
+    )
+  
+  temp_preds <- predict.modelBst(temp_smote100,
+                                 newdata = temp_test,
+                                 type = "class")
+  
+  temp_truths <- temp_test$X7
+  
+  temp_results <- tibble(X7 = temp_truths,
+                         .preds = temp_preds,
+                         Model = paste0("Smote100 - Fold", i))
+  
+  
+  results100 <- rbind(results100, temp_results)
+}
+
+conf_mat_smote100 <- 
+  conf_mat(results100,
+           X7, .preds)
+```
+
+``` r
+results300 <- tibble()
+
+for (i in 1:10) {
+  temp_train <-
+    mam.folds$splits[[i]] %>% 
+    training() %>% 
+    as.data.frame()
+  
+  temp_test <- 
+    mam.folds$splits[[i]] %>% 
+    testing() %>% 
+    as.data.frame()
+  
+  
+  temp_smote300 <-
+    sbo(
+    X7 ~ .,
+    data = temp_test,
+    size = 3,
+    alg = "rf",
+    over = 300,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+  
+  temp_preds <- predict.modelBst(temp_smote300,
+                                 newdata = temp_test,
+                                 type = "class")
+  
+  temp_truths <- temp_test$X7
+  
+  temp_results <- tibble(X7 = temp_truths,
+                         .preds = temp_preds,
+                         Model = paste0("Smote300 - Fold", i))
+  
+  
+  results300 <- rbind(results300, temp_results)
+}
+
+conf_mat_smote300 <- 
+  conf_mat(results300,
+           X7, .preds)
+```
+
 ``` r
 metric_table <- 
   do.call(
@@ -578,8 +672,8 @@ metric_table <-
       metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
       metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
       metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7"),
-      metrics(smote.100.conf.mat) %>% mutate(model = "SMOTEBOOST 100"),
-      metrics(smote.300.conf.mat) %>% mutate(model = "SMOTEBOOST 300")
+      metrics(conf_mat_smote100) %>% mutate(model = "SMOTEBOOST 100"),
+      metrics(conf_mat_smote300) %>% mutate(model = "SMOTEBOOST 300")
 
     )
   ) 
@@ -590,7 +684,7 @@ metric_table %>%
   facet_wrap(~Measure, scales = "free_x")
 ```
 
-![](Justin-Presentation-Code_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](Justin-Presentation-Code_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 metric_table %>% 
@@ -609,5 +703,5 @@ metric_table %>%
     ## 5 Balanced .5        0.595 0.990 0.815    0.898       0.688               0.903
     ## 6 Balanced .6        0.6   0.990 0.805    0.893       0.688               0.898
     ## 7 Balanced .7        0.6   0.990 0.816    0.899       0.692               0.903
-    ## 8 SMOTEBOOST 100     0.935 0.998 0.995    0.997       0.964               0.997
-    ## 9 SMOTEBOOST 300     0.93  0.998 0.979    0.989       0.954               0.989
+    ## 8 SMOTEBOOST 100     0.61  0.991 0.813    0.898       0.697               0.902
+    ## 9 SMOTEBOOST 300     0.97  0.999 0.995    0.997       0.982               0.997

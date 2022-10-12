@@ -567,6 +567,102 @@ smote.300.conf.mat <- tibble("truth" = mam.test$X7,
 
 ```
 
+### For loop for SMOTE Boost
+```{r}
+library(ebmc)
+results100 <- tibble()
+
+
+for (i in 1:10) {
+  temp_train <-
+    mam.folds$splits[[i]] %>% 
+    training() %>% 
+    as.data.frame()
+  
+  temp_test <- 
+    mam.folds$splits[[i]] %>% 
+    testing() %>% 
+    as.data.frame()
+  
+  
+  temp_smote100 <-
+    sbo(
+      X7 ~ .,
+      data = temp_train,
+      size = 3,
+      alg = "rf",
+      over = 100,
+      svm.ker = "sigmoid",
+      rf.ntree = 500
+    )
+  
+  temp_preds <- predict.modelBst(temp_smote100,
+                                 newdata = temp_test,
+                                 type = "class")
+  
+  temp_truths <- temp_test$X7
+  
+  temp_results <- tibble(X7 = temp_truths,
+                         .preds = temp_preds,
+                         Model = paste0("Smote100 - Fold", i))
+  
+  
+  results100 <- rbind(results100, temp_results)
+}
+
+conf_mat_smote100 <- 
+  conf_mat(results100,
+           X7, .preds)
+```
+
+```{r}
+results300 <- tibble()
+
+for (i in 1:10) {
+  temp_train <-
+    mam.folds$splits[[i]] %>% 
+    training() %>% 
+    as.data.frame()
+  
+  temp_test <- 
+    mam.folds$splits[[i]] %>% 
+    testing() %>% 
+    as.data.frame()
+  
+  
+  temp_smote300 <-
+    sbo(
+    X7 ~ .,
+    data = temp_test,
+    size = 3,
+    alg = "rf",
+    over = 300,
+    svm.ker = "sigmoid",
+    rf.ntree = 500
+  )
+  
+  temp_preds <- predict.modelBst(temp_smote300,
+                                 newdata = temp_test,
+                                 type = "class")
+  
+  temp_truths <- temp_test$X7
+  
+  temp_results <- tibble(X7 = temp_truths,
+                         .preds = temp_preds,
+                         Model = paste0("Smote300 - Fold", i))
+  
+  
+  results300 <- rbind(results300, temp_results)
+}
+
+conf_mat_smote300 <- 
+  conf_mat(results300,
+           X7, .preds)
+
+
+```
+
+
 ```{r}
 metric_table <- 
   do.call(
@@ -579,8 +675,8 @@ metric_table <-
       metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
       metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
       metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7"),
-      metrics(smote.100.conf.mat) %>% mutate(model = "SMOTEBOOST 100"),
-      metrics(smote.300.conf.mat) %>% mutate(model = "SMOTEBOOST 300")
+      metrics(conf_mat_smote100) %>% mutate(model = "SMOTEBOOST 100"),
+      metrics(conf_mat_smote300) %>% mutate(model = "SMOTEBOOST 300")
 
     )
   ) 
