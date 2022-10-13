@@ -165,7 +165,7 @@ set.seed(1234)
 
 oil.split <- initial_split(oil_data, strata = X50)
 oil.train <- training(oil.split)
-oil.test <- training(oil.split)
+oil.test <- testing(oil.split)
 
 set.seed(456)
 
