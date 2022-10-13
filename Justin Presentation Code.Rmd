@@ -488,7 +488,7 @@ mam.confusion.matrix.balanced.3 <-
 # library(ebmc)
 # 
 # #Models
-# mam.train2 <- as.data.frame(mam.train)  
+# mam.train2 <- as.data.frame(mam.train)
 # 
 # mam.fit.smote.100 <-
 #   sbo(
@@ -513,27 +513,28 @@ mam.confusion.matrix.balanced.3 <-
 # 
 # 
 # # Predictions
-# pred.mam.fit.smote.100 <- 
-#   predict.modelBst(mam.fit.smote.100, 
-#                    newdata = mam.test[,-7], 
+# pred.mam.fit.smote.100 <-
+#   predict.modelBst(mam.fit.smote.100,
+#                    newdata = mam.test[,-7],
 #                    type = "class")
 # 
-# pred.mam.fit.smote.300 <- 
-#   predict.modelBst(mam.fit.smote.300, 
-#                    newdata = mam.test[,-7], 
+# pred.mam.fit.smote.300 <-
+#   predict.modelBst(mam.fit.smote.300,
+#                    newdata = mam.test,
 #                    type = "class")
 # 
 # # confusion matrices
 # smote.100.conf.mat <- tibble("truth" = mam.test$X7,
-#                              "prediction" = pred.mam.fit.smote.100) %>% 
-#   conf_mat(truth = truth, 
-#            estimate = prediction) 
+#                              "prediction" = pred.mam.fit.smote.100) %>%
+#   conf_mat(truth = truth,
+#            estimate = prediction)
 # 
 # smote.300.conf.mat <- tibble("truth" = mam.test$X7,
-#                              "prediction" = pred.mam.fit.smote.300) %>% 
-#   conf_mat(truth = truth, 
-#            estimate = prediction) 
+#                              "prediction" = pred.mam.fit.smote.300) %>%
+#   conf_mat(truth = truth,
+#            estimate = prediction)
 # 
+# smote.300.conf.mat %>% metrics()
 
 ```
 
@@ -665,7 +666,14 @@ metric_table %>%
 metric_table %>% 
   pivot_wider(id_cols = model,
               values_from = Value,
-              names_from = Measure)
+              names_from = Measure) %>%
+  select(model, TPR, TNR, Precision, `F-Measure`, `G-Mean`, `Weighted Accuracy`) %>%
+  mutate(model = factor(model, 
+                        levels = c("SMOTE 100", "SMOTE 200",
+                                   "SMOTEBOOST 100", "SMOTEBOOST 200",
+                                   "Balanced .2", "Balanced .3",
+                                   "Weighted 2:1", "Weighted 3:1"))) %>%
+  arrange(model)
 
 ```
 
