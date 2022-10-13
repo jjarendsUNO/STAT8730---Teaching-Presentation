@@ -298,19 +298,22 @@ set.seed(456)
 mam.folds <- vfold_cv(mam.train, strata = X7)
 ```
 
-All the model recipes
+## All the model recipes
 
 ``` r
-mam.rec.balanced <- 
-  recipe(X7 ~ ., data = mam.train) %>% 
-  themis::step_upsample(X7, over_ratio = 1) 
-
-
 # Baseline
 mam.rec <- 
   recipe(X7 ~ ., data = mam.train)
 
+# Upsample
+mam.rec.balanced <- 
+  recipe(X7 ~ ., data = mam.train) %>% 
+  themis::step_upsample(X7, over_ratio = 1) 
+```
 
+### Smote
+
+``` r
 # Smote
 mam.rec.smote.100 <- 
   recipe(X7 ~., data = mam.train) %>% 
@@ -319,8 +322,11 @@ mam.rec.smote.100 <-
 mam.rec.smote.200 <- 
   recipe(X7 ~., data = mam.train) %>% 
   themis::step_smote(X7, over_ratio = 2)
+```
 
+### Class Weights
 
+``` r
 # Class Weights 
 rf.spec_w2 <- 
   rand_forest(trees = 1000,
@@ -333,29 +339,29 @@ rf.spec_w3 <-
   rand_forest(trees = 1000,
               mode = "classification") %>% 
   set_engine("ranger",
-              class.weights = c(1,5))
+              class.weights = c(1,3))
+```
 
+### Balanced Recipes
 
+``` r
 # Balanced Recipes
-rf.spec.balanced.5 <- 
+rf.spec.balanced.2 <- 
   rand_forest(trees = 1000,
               mode = "classification") %>% 
   set_engine("ranger",
-              mtry = .5)
+              mtry = .2)
 
-rf.spec.balanced.6 <- 
+rf.spec.balanced.3 <- 
   rand_forest(trees = 1000,
               mode = "classification") %>% 
   set_engine("ranger",
-              mtry = .6)
+              mtry = .3)
+```
 
+### Model Specifications and Workflow
 
-rf.spec.balanced.7 <- 
-  rand_forest(trees = 1000,
-              mode = "classification") %>% 
-  set_engine("ranger",
-              mtry = .7)
-
+``` r
 # Model Specifications
 rf.spec <- 
   rand_forest(trees = 1000,
@@ -368,6 +374,8 @@ mam.wf <-
   add_recipe(mam.rec) %>% 
   add_model(rf.spec_w2)
 ```
+
+# Resampling
 
 ``` r
 set.seed(123)
@@ -426,10 +434,10 @@ mam.fold.fit.smote.200 <-
                            save_workflow = TRUE)
   )
 
-mam.fold.fit.balanced.5 <- 
+mam.fold.fit.balanced.2 <- 
   mam.wf %>% 
   update_recipe(mam.rec.balanced) %>%
-  update_model(rf.spec.balanced.5) %>% 
+  update_model(rf.spec.balanced.2) %>% 
   fit_resamples(
     mam.folds,
     metrics = metric_set(
@@ -440,25 +448,10 @@ mam.fold.fit.balanced.5 <-
                            save_workflow = TRUE)
   )
 
-mam.fold.fit.balanced.6 <- 
+mam.fold.fit.balanced.3 <- 
   mam.wf %>% 
   update_recipe(mam.rec.balanced) %>%
-  update_model(rf.spec.balanced.6) %>% 
-  fit_resamples(
-    mam.folds,
-    metrics = metric_set(
-      accuracy,
-      roc_auc
-    ),
-    control = control_grid(save_pred = TRUE,
-                           save_workflow = TRUE)
-  )
-
-
-mam.fold.fit.balanced.7 <- 
-  mam.wf %>% 
-  update_recipe(mam.rec.balanced) %>%
-  update_model(rf.spec.balanced.7) %>% 
+  update_model(rf.spec.balanced.3) %>% 
   fit_resamples(
     mam.folds,
     metrics = metric_set(
@@ -470,110 +463,78 @@ mam.fold.fit.balanced.7 <-
   )
 ```
 
-## Joining all the different models into a single table to compare
-
-``` r
-metric_table <- 
-  do.call(
-    "rbind",
-    list(
-      metrics(mam.confusion.matrix.smote.100) %>% mutate(model = "SMOTE 100"),
-      metrics(mam.confusion.matrix.smote.200) %>% mutate(model = "SMOTE 200"),
-      metrics(mam.confusion.matrix.2) %>% mutate(model = "Weighted 2:1"),
-      metrics(mam.confusion.matrix.3) %>% mutate(model = "Weighted 3:1"),
-      metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
-      metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
-      metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7")
-    )
-  ) 
-
-metric_table %>% 
-  ggplot(aes(Value, model))+
-  geom_col()+
-  facet_wrap(~Measure, scales = "free_x")
-```
-
-![](Justin-Presentation-Code_files/figure-gfm/Metrics%20Table-1.png)<!-- -->
-
-``` r
-metric_table %>% 
-  pivot_wider(id_cols = model,
-              values_from = Value,
-              names_from = Measure)
-```
-
-    ## # A tibble: 7 × 7
-    ##   model        Precision   TNR   TPR `G-Mean` `F-Measure` `Weighted Accuracy`
-    ##   <chr>            <dbl> <dbl> <dbl>    <dbl>       <dbl>               <dbl>
-    ## 1 SMOTE 100        0.74  0.994 0.576    0.756       0.648               0.785
-    ## 2 SMOTE 200        0.715 0.993 0.601    0.772       0.653               0.797
-    ## 3 Weighted 2:1     0.525 0.989 0.847    0.915       0.648               0.918
-    ## 4 Weighted 3:1     0.54  0.989 0.850    0.917       0.661               0.920
-    ## 5 Balanced .5      0.595 0.990 0.815    0.898       0.688               0.903
-    ## 6 Balanced .6      0.6   0.990 0.805    0.893       0.688               0.898
-    ## 7 Balanced .7      0.6   0.990 0.816    0.899       0.692               0.903
+### Confusion Matrices
 
 ## SMOTEBoost
 
 ``` r
-library(ebmc)
+# Commenting all this out as I'm going to run a for loop for cross-validation
+# Commenting all this out as I'm going to run a for loop for cross-validation
+# Commenting all this out as I'm going to run a for loop for cross-validation
+# Commenting all this out as I'm going to run a for loop for cross-validation
+#
 
-#Models
-mam.train2 <- as.data.frame(mam.train)  
-
-mam.fit.smote.100 <-
-  sbo(
-    X7 ~ .,
-    data = mam.train2,
-    size = 3,
-    alg = "rf",
-    over = 100,
-    svm.ker = "sigmoid",
-    rf.ntree = 500
-  )
-mam.fit.smote.300 <-
-  sbo(
-    X7 ~ .,
-    data = mam.train2,
-    size = 3,
-    alg = "rf",
-    over = 300,
-    svm.ker = "sigmoid",
-    rf.ntree = 500
-  )
-
-
-# Predictions
-pred.mam.fit.smote.100 <- 
-  predict.modelBst(mam.fit.smote.100, 
-                   newdata = mam.test[,-7], 
-                   type = "class")
-
-pred.mam.fit.smote.300 <- 
-  predict.modelBst(mam.fit.smote.300, 
-                   newdata = mam.test[,-7], 
-                   type = "class")
-
-# confusion matrices
-smote.100.conf.mat <- tibble("truth" = mam.test$X7,
-                             "prediction" = pred.mam.fit.smote.100) %>% 
-  conf_mat(truth = truth, 
-           estimate = prediction) 
-
-smote.300.conf.mat <- tibble("truth" = mam.test$X7,
-                             "prediction" = pred.mam.fit.smote.300) %>% 
-  conf_mat(truth = truth, 
-           estimate = prediction) 
+# library(ebmc)
+# 
+# #Models
+# mam.train2 <- as.data.frame(mam.train)  
+# 
+# mam.fit.smote.100 <-
+#   sbo(
+#     X7 ~ .,
+#     data = mam.train2,
+#     size = 3,
+#     alg = "rf",
+#     over = 100,
+#     svm.ker = "sigmoid",
+#     rf.ntree = 500
+#   )
+# mam.fit.smote.300 <-
+#   sbo(
+#     X7 ~ .,
+#     data = mam.train2,
+#     size = 3,
+#     alg = "rf",
+#     over = 300,
+#     svm.ker = "sigmoid",
+#     rf.ntree = 500
+#   )
+# 
+# 
+# # Predictions
+# pred.mam.fit.smote.100 <- 
+#   predict.modelBst(mam.fit.smote.100, 
+#                    newdata = mam.test[,-7], 
+#                    type = "class")
+# 
+# pred.mam.fit.smote.300 <- 
+#   predict.modelBst(mam.fit.smote.300, 
+#                    newdata = mam.test[,-7], 
+#                    type = "class")
+# 
+# # confusion matrices
+# smote.100.conf.mat <- tibble("truth" = mam.test$X7,
+#                              "prediction" = pred.mam.fit.smote.100) %>% 
+#   conf_mat(truth = truth, 
+#            estimate = prediction) 
+# 
+# smote.300.conf.mat <- tibble("truth" = mam.test$X7,
+#                              "prediction" = pred.mam.fit.smote.300) %>% 
+#   conf_mat(truth = truth, 
+#            estimate = prediction) 
+# 
 ```
 
-### For loop for SMOTE Boost
+### For loops for SMOTE Boost
 
 ``` r
 library(ebmc)
+doParallel::registerDoParallel()
 results100 <- tibble()
 
 
 for (i in 1:10) {
+  print(i)
   temp_train <-
     mam.folds$splits[[i]] %>% 
     training() %>% 
@@ -609,16 +570,31 @@ for (i in 1:10) {
   
   results100 <- rbind(results100, temp_results)
 }
+```
 
+    ## [1] 1
+    ## [1] 2
+    ## [1] 3
+    ## [1] 4
+    ## [1] 5
+    ## [1] 6
+    ## [1] 7
+    ## [1] 8
+    ## [1] 9
+    ## [1] 10
+
+``` r
 conf_mat_smote100 <- 
   conf_mat(results100,
            X7, .preds)
 ```
 
 ``` r
+doParallel::registerDoParallel()
 results300 <- tibble()
 
 for (i in 1:10) {
+  print(i)
   temp_train <-
     mam.folds$splits[[i]] %>% 
     training() %>% 
@@ -630,18 +606,18 @@ for (i in 1:10) {
     as.data.frame()
   
   
-  temp_smote300 <-
+  temp_smote200 <-
     sbo(
     X7 ~ .,
     data = temp_test,
     size = 3,
     alg = "rf",
-    over = 300,
+    over = 200,
     svm.ker = "sigmoid",
     rf.ntree = 500
   )
   
-  temp_preds <- predict.modelBst(temp_smote300,
+  temp_preds <- predict.modelBst(temp_smote200,
                                  newdata = temp_test,
                                  type = "class")
   
@@ -654,11 +630,28 @@ for (i in 1:10) {
   
   results300 <- rbind(results300, temp_results)
 }
+```
 
+    ## [1] 1
+    ## [1] 2
+    ## [1] 3
+    ## [1] 4
+    ## [1] 5
+    ## [1] 6
+    ## [1] 7
+    ## [1] 8
+    ## [1] 9
+    ## [1] 10
+
+``` r
 conf_mat_smote300 <- 
   conf_mat(results300,
            X7, .preds)
+
+doParallel::stopImplicitCluster()
 ```
+
+# Results
 
 ``` r
 metric_table <- 
@@ -669,11 +662,10 @@ metric_table <-
       metrics(mam.confusion.matrix.smote.200) %>% mutate(model = "SMOTE 200"),
       metrics(mam.confusion.matrix.2) %>% mutate(model = "Weighted 2:1"),
       metrics(mam.confusion.matrix.3) %>% mutate(model = "Weighted 3:1"),
-      metrics(mam.confusion.matrix.balanced.5) %>% mutate(model = "Balanced .5"),
-      metrics(mam.confusion.matrix.balanced.6) %>% mutate(model = "Balanced .6"),
-      metrics(mam.confusion.matrix.balanced.7) %>% mutate(model = "Balanced .7"),
+      metrics(mam.confusion.matrix.balanced.2) %>% mutate(model = "Balanced .2"),
+      metrics(mam.confusion.matrix.balanced.3) %>% mutate(model = "Balanced .3"),
       metrics(conf_mat_smote100) %>% mutate(model = "SMOTEBOOST 100"),
-      metrics(conf_mat_smote300) %>% mutate(model = "SMOTEBOOST 300")
+      metrics(conf_mat_smote300) %>% mutate(model = "SMOTEBOOST 200")
 
     )
   ) 
@@ -684,7 +676,7 @@ metric_table %>%
   facet_wrap(~Measure, scales = "free_x")
 ```
 
-![](Justin-Presentation-Code_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](Justin-Presentation-Code_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 ``` r
 metric_table %>% 
@@ -693,15 +685,14 @@ metric_table %>%
               names_from = Measure)
 ```
 
-    ## # A tibble: 9 × 7
+    ## # A tibble: 8 × 7
     ##   model          Precision   TNR   TPR `G-Mean` `F-Measure` `Weighted Accuracy`
     ##   <chr>              <dbl> <dbl> <dbl>    <dbl>       <dbl>               <dbl>
     ## 1 SMOTE 100          0.74  0.994 0.576    0.756       0.648               0.785
     ## 2 SMOTE 200          0.715 0.993 0.601    0.772       0.653               0.797
     ## 3 Weighted 2:1       0.525 0.989 0.847    0.915       0.648               0.918
     ## 4 Weighted 3:1       0.54  0.989 0.850    0.917       0.661               0.920
-    ## 5 Balanced .5        0.595 0.990 0.815    0.898       0.688               0.903
-    ## 6 Balanced .6        0.6   0.990 0.805    0.893       0.688               0.898
-    ## 7 Balanced .7        0.6   0.990 0.816    0.899       0.692               0.903
-    ## 8 SMOTEBOOST 100     0.61  0.991 0.813    0.898       0.697               0.902
-    ## 9 SMOTEBOOST 300     0.97  0.999 0.995    0.997       0.982               0.997
+    ## 5 Balanced .2        0.595 0.990 0.815    0.898       0.688               0.903
+    ## 6 Balanced .3        0.6   0.990 0.805    0.893       0.688               0.898
+    ## 7 SMOTEBOOST 100     0.6   0.990 0.833    0.908       0.698               0.912
+    ## 8 SMOTEBOOST 200     0.945 0.999 0.984    0.991       0.964               0.992
