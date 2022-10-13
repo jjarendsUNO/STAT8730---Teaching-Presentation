@@ -252,7 +252,7 @@ set.seed(1234)
 
 mam.split <- initial_split(mam.data, strata = X7)
 mam.train <- training(mam.split)
-mam.test <- training(mam.split)
+mam.test <- testing(mam.split)
 
 set.seed(456)
 
