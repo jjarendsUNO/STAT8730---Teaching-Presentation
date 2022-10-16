@@ -159,7 +159,7 @@ set.seed(1234)
 
 oil.split <- initial_split(oil_data, strata = X50)
 oil.train <- training(oil.split)
-oil.test <- training(oil.split)
+oil.test <- testing(oil.split)
 
 set.seed(456)
 
@@ -291,7 +291,7 @@ set.seed(1234)
 
 mam.split <- initial_split(mam.data, strata = X7)
 mam.train <- training(mam.split)
-mam.test <- training(mam.split)
+mam.test <- testing(mam.split)
 
 set.seed(456)
 
@@ -477,7 +477,7 @@ mam.fold.fit.balanced.3 <-
 # library(ebmc)
 # 
 # #Models
-# mam.train2 <- as.data.frame(mam.train)  
+# mam.train2 <- as.data.frame(mam.train)
 # 
 # mam.fit.smote.100 <-
 #   sbo(
@@ -502,27 +502,28 @@ mam.fold.fit.balanced.3 <-
 # 
 # 
 # # Predictions
-# pred.mam.fit.smote.100 <- 
-#   predict.modelBst(mam.fit.smote.100, 
-#                    newdata = mam.test[,-7], 
+# pred.mam.fit.smote.100 <-
+#   predict.modelBst(mam.fit.smote.100,
+#                    newdata = mam.test[,-7],
 #                    type = "class")
 # 
-# pred.mam.fit.smote.300 <- 
-#   predict.modelBst(mam.fit.smote.300, 
-#                    newdata = mam.test[,-7], 
+# pred.mam.fit.smote.300 <-
+#   predict.modelBst(mam.fit.smote.300,
+#                    newdata = mam.test,
 #                    type = "class")
 # 
 # # confusion matrices
 # smote.100.conf.mat <- tibble("truth" = mam.test$X7,
-#                              "prediction" = pred.mam.fit.smote.100) %>% 
-#   conf_mat(truth = truth, 
-#            estimate = prediction) 
+#                              "prediction" = pred.mam.fit.smote.100) %>%
+#   conf_mat(truth = truth,
+#            estimate = prediction)
 # 
 # smote.300.conf.mat <- tibble("truth" = mam.test$X7,
-#                              "prediction" = pred.mam.fit.smote.300) %>% 
-#   conf_mat(truth = truth, 
-#            estimate = prediction) 
+#                              "prediction" = pred.mam.fit.smote.300) %>%
+#   conf_mat(truth = truth,
+#            estimate = prediction)
 # 
+# smote.300.conf.mat %>% metrics()
 ```
 
 ### For loops for SMOTE Boost
@@ -682,17 +683,24 @@ metric_table %>%
 metric_table %>% 
   pivot_wider(id_cols = model,
               values_from = Value,
-              names_from = Measure)
+              names_from = Measure) %>%
+  select(model, TPR, TNR, Precision, `F-Measure`, `G-Mean`, `Weighted Accuracy`) %>%
+  mutate(model = factor(model, 
+                        levels = c("SMOTE 100", "SMOTE 200",
+                                   "SMOTEBOOST 100", "SMOTEBOOST 200",
+                                   "Balanced .2", "Balanced .3",
+                                   "Weighted 2:1", "Weighted 3:1"))) %>%
+  arrange(model)
 ```
 
     ## # A tibble: 8 × 7
-    ##   model          Precision   TNR   TPR `G-Mean` `F-Measure` `Weighted Accuracy`
-    ##   <chr>              <dbl> <dbl> <dbl>    <dbl>       <dbl>               <dbl>
-    ## 1 SMOTE 100          0.74  0.994 0.576    0.756       0.648               0.785
-    ## 2 SMOTE 200          0.715 0.993 0.601    0.772       0.653               0.797
-    ## 3 Weighted 2:1       0.525 0.989 0.847    0.915       0.648               0.918
-    ## 4 Weighted 3:1       0.54  0.989 0.850    0.917       0.661               0.920
-    ## 5 Balanced .2        0.595 0.990 0.815    0.898       0.688               0.903
-    ## 6 Balanced .3        0.6   0.990 0.805    0.893       0.688               0.898
-    ## 7 SMOTEBOOST 100     0.6   0.990 0.833    0.908       0.698               0.912
-    ## 8 SMOTEBOOST 200     0.945 0.999 0.984    0.991       0.964               0.992
+    ##   model            TPR   TNR Precision `F-Measure` `G-Mean` `Weighted Accuracy`
+    ##   <fct>          <dbl> <dbl>     <dbl>       <dbl>    <dbl>               <dbl>
+    ## 1 SMOTE 100      0.576 0.994     0.74        0.648    0.756               0.785
+    ## 2 SMOTE 200      0.601 0.993     0.715       0.653    0.772               0.797
+    ## 3 SMOTEBOOST 100 0.833 0.990     0.6         0.698    0.908               0.912
+    ## 4 SMOTEBOOST 200 0.984 0.999     0.945       0.964    0.991               0.992
+    ## 5 Balanced .2    0.815 0.990     0.595       0.688    0.898               0.903
+    ## 6 Balanced .3    0.805 0.990     0.6         0.688    0.893               0.898
+    ## 7 Weighted 2:1   0.847 0.989     0.525       0.648    0.915               0.918
+    ## 8 Weighted 3:1   0.850 0.989     0.54        0.661    0.917               0.920
